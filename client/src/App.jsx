@@ -1,36 +1,43 @@
-import { useEffect, useState } from 'react'
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { useAuth } from './auth/AuthContext.jsx'
+import LoginPage from './pages/LoginPage.jsx'
+import CitiesPage from './pages/CitiesPage.jsx'
+import CityPlacesPage from './pages/CityPlacesPage.jsx'
 import './App.css'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+function RequireAuth({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) return <p className="muted">Loading…</p>
+  if (!user) return <Navigate to="/login" replace />
+  return children
+}
 
-function App() {
-  const [status, setStatus] = useState('checking')
-
-  useEffect(() => {
-    fetch(`${API_URL}/api/health`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        return res.json()
-      })
-      .then((data) => setStatus(data.status === 'ok' ? 'connected' : 'error'))
-      .catch(() => setStatus('error'))
-  }, [])
-
-  const label = {
-    checking: 'Checking backend…',
-    connected: 'Backend connected',
-    error: 'Backend not reachable',
-  }[status]
-
+function Header() {
+  const { user, logout } = useAuth()
+  if (!user) return null
   return (
-    <main className="app">
-      <h1>AI Trip Planner</h1>
-      <p className={`status status--${status}`}>
-        <span className="dot" aria-hidden="true" />
-        {label}
-      </p>
-    </main>
+    <header className="app-header">
+      <span className="brand">AI Trip Planner</span>
+      <span className="header-right">
+        <span className="muted">{user.email}</span>
+        <button className="btn btn--ghost" onClick={logout}>Log out</button>
+      </span>
+    </header>
   )
 }
 
-export default App
+export default function App() {
+  return (
+    <>
+      <Header />
+      <main className="app">
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/cities" element={<RequireAuth><CitiesPage /></RequireAuth>} />
+          <Route path="/cities/:cityId" element={<RequireAuth><CityPlacesPage /></RequireAuth>} />
+          <Route path="*" element={<Navigate to="/cities" replace />} />
+        </Routes>
+      </main>
+    </>
+  )
+}
