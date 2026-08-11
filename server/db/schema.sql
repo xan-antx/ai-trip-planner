@@ -27,3 +27,9 @@ CREATE TABLE IF NOT EXISTS places (
 
 -- Phase 2 will filter by city + category constantly.
 CREATE INDEX IF NOT EXISTS places_city_category_idx ON places (city_id, category);
+
+-- Phase 3: coordinates for distance-based "near X" retrieval. Nullable — only
+-- Jaipur is populated so far; cities without coordinates fall back to matching
+-- on the area column.
+ALTER TABLE places ADD COLUMN IF NOT EXISTS lat NUMERIC;
+ALTER TABLE places ADD COLUMN IF NOT EXISTS lng NUMERIC;

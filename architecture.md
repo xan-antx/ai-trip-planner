@@ -5,7 +5,9 @@ Build status
 Phase 0 — Scaffold: done. Vite + React client, Express server, GET /api/health.
 Phase 1 — Database + auth: done. Schema, seed data, signup/login/JWT.
 Phase 2 — City and places UI: not started.
-Phase 3 — Gemini chatbot: not started.
+Phase 3 — Gemini chatbot: done. POST /api/chat — two-hop area retrieval over the
+  places table, plus an always-on compact index of every place in the city, sent to
+  Gemini (gemini-flash-latest) as grounding.
 Phase 4 — Amadeus MCP server + client: not started.
 
 1. Drop the Complex Vector Databases (RAG)
@@ -28,7 +30,8 @@ Three tables, defined in server/db/schema.sql:
 
 - users — id, email (unique), password_hash, created_at.
 - cities — id, name.
-- places — id, city_id (FK to cities), category, name, area, description, price_level.
+- places — id, city_id (FK to cities), category, name, area, description, price_level,
+  lat, lng (both nullable; Jaipur only so far).
 
 Everything a city contains lives in the single places table, distinguished by a category column
 constrained to 'tourist_spot', 'stay', 'restaurant', or 'cafe'. One table rather than four keeps the
@@ -52,8 +55,10 @@ When the user asks the chatbot a specific question (e.g., "Food places near Hawa
 Extract that relevant information from your database and append it as "context" to the user's prompt.
 Send this combined prompt (User Question + Database Context) to the Gemini API so it can generate a highly accurate, customized response.
 If the user asks for something outside your database (like "I want to eat vegan"), the Gemini API will seamlessly handle it using its own pre-trained knowledge since that data won't exist in your DB.
-The area column is the useful join here: a question naming a place can be matched to its area, and
-everything else in that area pulled in as context.
+Retrieval works outward from any place the message names. Where the named place has coordinates,
+everything within RADIUS_KM (1.5 km, a named constant in chat.js) is pulled in as context — the area
+column alone cannot express proximity, since Hawa Mahal sits in "Badi Chaupar" while the cafes facing
+it are filed under "Hawa Mahal Road". Cities not yet geocoded fall back to exact-area expansion.
 
 Authentication
 

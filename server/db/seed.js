@@ -7,6 +7,55 @@
  */
 import pool from './pool.js';
 
+/**
+ * Coordinates, keyed by city then place name: [lat, lng].
+ * Kept separate from the CITIES tuples so adding coordinates doesn't reshape
+ * all 140 existing entries, and so it stays obvious which cities have them.
+ *
+ * Jaipur only for now — every other city seeds lat/lng as NULL and falls back
+ * to area-based matching in the chat retrieval.
+ *
+ * NOTE: these are hand-entered approximations (good to roughly a block), not
+ * geocoder output. They are accurate enough to cluster places at a 1.5 km
+ * radius; re-geocode them if you ever need finer precision than that.
+ */
+const COORDS = {
+  Jaipur: {
+    // tourist_spot
+    'Hawa Mahal': [26.9239, 75.8267],
+    'Amber Fort': [26.9855, 75.8513],
+    'City Palace': [26.9258, 75.8237],
+    'Jantar Mantar': [26.9247, 75.8246],
+    'Nahargarh Fort': [26.9374, 75.8153],
+    'Jal Mahal': [26.9535, 75.8460],
+    'Albert Hall Museum': [26.9117, 75.8194],
+    // stay
+    'Rambagh Palace': [26.8983, 75.8078],
+    'Samode Haveli': [26.9333, 75.8283],
+    'ITC Rajputana': [26.9247, 75.7908],
+    'Alsisar Haveli': [26.9204, 75.7997],
+    'Jai Mahal Palace': [26.9155, 75.7900],
+    'Hotel Pearl Palace': [26.9130, 75.8060],
+    'Zostel Jaipur': [26.9110, 75.7830],
+    // restaurant
+    'Chokhi Dhani': [26.7620, 75.8330],
+    'Handi Restaurant': [26.9165, 75.8135],
+    'Laxmi Mishthan Bhandar': [26.9209, 75.8266],
+    Niros: [26.9163, 75.8155],
+    '1135 AD': [26.9855, 75.8513],
+    'Spice Court': [26.9130, 75.7920],
+    'Rawat Mishtan Bhandar': [26.9192, 75.7930],
+    // cafe
+    'Tapri Central': [26.9060, 75.7990],
+    'Curious Life Coffee Roasters': [26.9020, 75.7960],
+    'Cafe Palladio': [26.8980, 75.8180],
+    'Anokhi Cafe': [26.9040, 75.7980],
+    'Tattoo Cafe & Lounge': [26.9243, 75.8270],
+    'Wind View Cafe': [26.9241, 75.8271],
+    'Jaipur Modern Kitchen': [26.9030, 75.7950],
+  },
+};
+
 // [name, area, description, price_level]  — price_level is null for tourist_spot
 const CITIES = {
   Jaipur: {
@@ -225,14 +274,17 @@ async function seed() {
 
       for (const [category, places] of Object.entries(categories)) {
         for (const [name, area, description, priceLevel = null] of places) {
+          const [lat = null, lng = null] = COORDS[cityName]?.[name] ?? [];
           await client.query(
-            `INSERT INTO places (city_id, category, name, area, description, price_level)
-             VALUES ($1, $2, $3, $4, $5, $6)
+            `INSERT INTO places (city_id, category, name, area, description, price_level, lat, lng)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              ON CONFLICT (city_id, category, name) DO UPDATE
                SET area = EXCLUDED.area,
                    description = EXCLUDED.description,
-                   price_level = EXCLUDED.price_level`,
-            [cityId, category, name, area, description, priceLevel]
+                   price_level = EXCLUDED.price_level,
+                   lat = EXCLUDED.lat,
+                   lng = EXCLUDED.lng`,
+            [cityId, category, name, area, description, priceLevel, lat, lng]
           );
           placeCount += 1;
         }
