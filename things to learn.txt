@@ -1,0 +1,6 @@
+The client-server-database mental model (above). Non-negotiable foundation.
+What an "API" and an HTTP request actually are — how the frontend and backend talk. GET, POST, JSON.
+The database layer — tables, rows, and what a SQL query like "give me all places where city = Jaipur" does. Plus foreign keys (why places links to cities).
+The backend — how Express "routes" work: a URL like /api/cities maps to a function that runs when that URL is hit.
+The frontend — how React shows data and updates the screen when you click.
+Authentication — what a password hash is, what a JWT is, why login works the way it does.
