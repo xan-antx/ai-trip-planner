@@ -18,9 +18,15 @@ export const SUPPORTED_CITIES = ['Jaipur', 'Chandigarh', 'Amritsar', 'Mumbai', '
 const DESCRIPTION = `Search live hotel availability and nightly prices for a city over a specific
 date range, using real inventory from the LiteAPI travel API.
 
-Call this when the question depends on current prices or real availability —
-booking, staying, room costs, what's available ("hotels in Jaipur next
-weekend", "where can I stay in Shimla", "how much is a room in Mumbai").
+ALWAYS call this tool for any question about accommodation — hotels, hostels,
+guesthouses, homestays, resorts, where to stay, where to sleep, where to book.
+
+This applies even when the user gives no dates, states no budget, and never
+mentions price. "Where should I stay", "any good hotels", "where to sleep in
+Jaipur", "recommend somewhere to stay" and "which area should I stay in" all
+require this tool. Accommodation is never answered from local data alone: the
+curated list has no availability and no prices, so answering from it would
+mean inventing both.
 
 Supported cities are exactly: Jaipur, Chandigarh, Amritsar, Mumbai, Shimla.
 If the user asks about any other city, do NOT call this tool at all. Tell them
@@ -29,9 +35,12 @@ substitute city: do not map an unsupported city to the nearest, largest, or
 most similar supported one, and do not guess which supported city the user
 might have meant. Asking about Delhi is not a reason to search Jaipur.
 
-Do NOT call this for questions the app's own curated place data already
-answers: what to see, where to eat, which neighbourhood suits someone. Those
-are answered from local database context, not live inventory.
+Do NOT call this for questions that are not about accommodation. Sights, food
+and drink, and the character of a neighbourhood as a place to spend time are
+answered from the app's curated place data. "What should I see", "where do I
+eat near Hawa Mahal" and "which area is nicest to wander around" need no tool
+call. The exclusion is limited to those; it never covers accommodation. If a
+question asks where to sleep or book in any form, the paragraph above wins.
 
 Dates: if the user names dates, pass them through exactly as given. If the
 user gives no dates, omit checkIn and checkOut — the tool then defaults to a

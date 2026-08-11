@@ -7,10 +7,21 @@ if (!process.env.GEMINI_API_KEY) {
   throw new Error('GEMINI_API_KEY is not set — copy server/.env.example to server/.env');
 }
 
-// Floating alias that tracks Google's current flash model — avoids pinning to a
-// version that later gets retired for new keys (as gemini-2.5-flash was).
-const MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+// Floating alias, so a retired version can't break the app (as gemini-2.5-flash
+// did). The *lite* alias is the fallback because the plain gemini-flash-latest
+// resolves to gemini-3.6-flash, capped at 20 free requests/project/day — and a
+// tool-firing chat costs two calls, so that runs out after ~10 hotel questions.
+// Override with GEMINI_MODEL once you're off the free tier.
+const MODEL = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
 const TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS) || 15000;
+
+/**
+ * Output ceiling, not a target — a short answer costs the same at 2048 as at
+ * 800, so one generous value serves both reply shapes rather than branching.
+ * 800 was too tight: tool-call replies format up to 10 hotels with names,
+ * prices and room types, and were being cut off mid-entry.
+ */
+const MAX_OUTPUT_TOKENS = Number(process.env.GEMINI_MAX_OUTPUT_TOKENS) || 2048;
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -39,7 +50,7 @@ async function callGemini({ contents, systemInstruction, tools }) {
       config: {
         systemInstruction,
         temperature: 0.7,
-        maxOutputTokens: 800,
+        maxOutputTokens: MAX_OUTPUT_TOKENS,
         abortSignal: controller.signal,
         httpOptions: { timeout: TIMEOUT_MS },
         ...(tools?.length ? { tools: [{ functionDeclarations: tools }] } : {}),
@@ -50,6 +61,15 @@ async function callGemini({ contents, systemInstruction, tools }) {
       throw new GeminiError(`Gemini request timed out after ${TIMEOUT_MS}ms`, {
         status: 504,
         clientMessage: 'The AI service took too long to respond. Please try again.',
+      });
+    }
+    // Quota exhaustion is common on the free tier and needs its own message —
+    // "service unavailable" sends you debugging the wrong thing entirely.
+    if (err.status === 429 || /RESOURCE_EXHAUSTED|quota/i.test(err.message ?? '')) {
+      const retry = err.message?.match(/retry in ([\d.]+)s/i)?.[1];
+      throw new GeminiError(`Gemini quota exceeded: ${err.message}`, {
+        status: 429,
+        clientMessage: `AI request quota exceeded${retry ? ` — retry in about ${Math.ceil(Number(retry))}s` : ''}. The Gemini free tier is limited per model per day.`,
       });
     }
     throw new GeminiError(`Gemini request failed: ${err.message}`, { status: 502 });
@@ -110,6 +130,14 @@ export async function generateChatReply({ systemInstruction, userPrompt, tools, 
         status: 502,
         clientMessage: 'The AI service could not generate a response for that message.',
       });
+    }
+
+    // Truncation is otherwise silent — the reply just stops mid-sentence and
+    // still looks like a valid 200. Surface it so the cap can be tuned.
+    if (response?.candidates?.[0]?.finishReason === 'MAX_TOKENS') {
+      console.warn(
+        `Gemini reply hit MAX_TOKENS (${MAX_OUTPUT_TOKENS}) and was truncated — raise GEMINI_MAX_OUTPUT_TOKENS.`
+      );
     }
 
     return { text, toolCalls };

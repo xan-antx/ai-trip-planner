@@ -96,6 +96,13 @@ replaced both: a static X-API-Key header, self-service sandbox signup, no browse
    call over MCP, feeds the result back, and Gemini writes the final answer. Bounded at two tool
    rounds. Questions answerable from local data never trigger a call.
 
+Quota note: a tool-firing chat costs TWO Gemini calls, not one — the first decides to call
+search_hotels, the second writes the answer from what it returned. Free-tier limits are counted in
+requests, so they bite roughly twice as fast as the number of user messages suggests. This is why
+GEMINI_MODEL is pinned to gemini-flash-lite-latest: the gemini-flash-latest alias resolves to
+gemini-3.6-flash, capped at 20 free requests per project per day, which is about 10 hotel questions
+before the app starts returning 429. Non-hotel chats still cost one call each.
+
 Guardrails, all three the same shape — report the limit honestly rather than substituting something
 plausible:
 - Unsupported city: the enum rejects it at the schema layer, and the tool description separately

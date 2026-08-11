@@ -219,6 +219,9 @@ router.post('/', requireAuth, async (req, res, next) => {
         executeTool: tools ? callTool : undefined,
       }));
     } catch (err) {
+      // Log the real cause: the client only sees a sanitised message, so
+      // without this a quota error is indistinguishable from an outage.
+      console.error('Gemini call failed:', err.message);
       // Clear upstream error — never a silent empty 200.
       return res
         .status(err.status || 502)
