@@ -1,0 +1,299 @@
+/* Chat panel — uses the same custom properties as index.css, so it
+   follows light/dark automatically with no extra work. */
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  /* Tall enough to feel like a conversation, short enough that the places
+     list beside it stays visible. */
+  height: min(70vh, 620px);
+}
+
+.chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.chat-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+.btn--small {
+  padding: 4px 10px;
+  font-size: 14px;
+}
+
+/* ---------- log ---------- */
+
+.chat-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  scrollbar-width: thin;
+}
+
+.chat-empty {
+  margin: auto 0;
+  text-align: center;
+}
+
+.chat-suggestions {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.chat-suggestion {
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.chat-suggestion:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+
+.chat-msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 92%;
+}
+
+.chat-msg--user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.chat-msg--assistant {
+  align-self: flex-start;
+}
+
+.chat-bubble {
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 15px;
+  line-height: 152%;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  overflow-wrap: anywhere;
+}
+
+.chat-msg--user .chat-bubble {
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  border-bottom-right-radius: 4px;
+}
+
+.chat-msg--assistant .chat-bubble {
+  border-bottom-left-radius: 4px;
+  color: var(--text-h);
+}
+
+/* ---------- rendered markdown ---------- */
+
+.md-p {
+  margin: 0 0 8px;
+}
+.md-p:last-child {
+  margin-bottom: 0;
+}
+
+.md-head {
+  margin: 12px 0 6px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+.md-head:first-child {
+  margin-top: 0;
+}
+.md-head--1,
+.md-head--2 {
+  font-size: 17px;
+}
+.md-head--3 {
+  font-size: 16px;
+}
+.md-head--4 {
+  font-size: 15px;
+}
+
+.md-list {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+.md-list:last-child {
+  margin-bottom: 0;
+}
+.md-list li {
+  margin-bottom: 5px;
+}
+
+.md-rule {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 12px 0;
+}
+
+/* ---------- grounding chips ---------- */
+
+.chat-context {
+  margin: 7px 2px 0;
+  font-size: 13px;
+  line-height: 150%;
+  color: var(--text);
+}
+
+.chat-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 3px 4px 0 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--code-bg);
+  color: var(--text-h);
+  font-size: 12.5px;
+}
+
+.chat-chip-dist {
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+/* ---------- thinking indicator ---------- */
+
+.chat-bubble--thinking {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 14px;
+}
+
+.chat-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text);
+  opacity: 0.4;
+  animation: chat-blink 1.3s infinite ease-in-out;
+}
+.chat-dot:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.chat-dot:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes chat-blink {
+  0%,
+  70%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  35% {
+    opacity: 0.9;
+    transform: translateY(-3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-dot {
+    animation: none;
+  }
+}
+
+/* ---------- input ---------- */
+
+.chat-error {
+  margin: 0 16px 8px;
+  font-size: 14px;
+}
+
+.chat-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* App.css sets .btn--primary { width: 100% } for the full-width login button.
+   In this flex row that would claim the whole width and squeeze the textarea
+   to a sliver, so scope it back to intrinsic width here. */
+.chat-input-row .btn--primary {
+  width: auto;
+}
+
+.chat-input {
+  flex: 1;
+  font: inherit;
+  font-size: 15px;
+  resize: none;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.chat-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.chat-input:disabled {
+  opacity: 0.6;
+}
+
+/* ---------- two-column page layout ---------- */
+
+.city-layout {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 24px;
+  align-items: start;
+}
+
+/* The chat sticks while the places list scrolls past it. */
+.city-layout > .chat-panel {
+  position: sticky;
+  top: 20px;
+}
+
+@media (max-width: 1024px) {
+  .city-layout {
+    grid-template-columns: 1fr;
+  }
+  .city-layout > .chat-panel {
+    position: static;
+    height: min(60vh, 480px);
+  }
+}

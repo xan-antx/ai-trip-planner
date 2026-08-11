@@ -1,0 +1,105 @@
+/**
+ * MCP server exposing live hotel search over stdio.
+ *
+ * Runs as a child process of the Express server, which passes LITEAPI_KEY
+ * through the spawn environment. Nothing here is reachable from the browser.
+ */
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
+import { searchHotels, defaultDates } from './liteapi.js';
+
+export const SUPPORTED_CITIES = ['Jaipur', 'Chandigarh', 'Amritsar', 'Mumbai', 'Shimla'];
+
+// The model reads this to decide whether to call the tool at all, so the
+// boundaries matter as much as the capability. Note the substitution rule:
+// an enum can reject "Delhi", but it cannot stop the model silently searching
+// Jaipur instead — only this text can.
+const DESCRIPTION = `Search live hotel availability and nightly prices for a city over a specific
+date range, using real inventory from the LiteAPI travel API.
+
+Call this when the question depends on current prices or real availability —
+booking, staying, room costs, what's available ("hotels in Jaipur next
+weekend", "where can I stay in Shimla", "how much is a room in Mumbai").
+
+Supported cities are exactly: Jaipur, Chandigarh, Amritsar, Mumbai, Shimla.
+If the user asks about any other city, do NOT call this tool at all. Tell them
+the app currently covers only those five cities. Never call this tool with a
+substitute city: do not map an unsupported city to the nearest, largest, or
+most similar supported one, and do not guess which supported city the user
+might have meant. Asking about Delhi is not a reason to search Jaipur.
+
+Do NOT call this for questions the app's own curated place data already
+answers: what to see, where to eat, which neighbourhood suits someone. Those
+are answered from local database context, not live inventory.
+
+Dates: if the user names dates, pass them through exactly as given. If the
+user gives no dates, omit checkIn and checkOut — the tool then defaults to a
+two-night stay about two weeks out, a sensible near-term default for trip
+planning.
+
+An empty hotels array is a real and meaningful answer: it means no
+availability was returned for those exact dates. It is not an error and not a
+prompt to retry. Report it plainly, never substitute different dates, and
+never fill the gap with hotels you recall independently of this tool.`;
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+const server = new McpServer({ name: 'mcp-hotels', version: '1.0.0' });
+
+server.registerTool(
+  'search_hotels',
+  {
+    title: 'Search live hotel availability',
+    description: DESCRIPTION,
+    inputSchema: {
+      city: z.enum(SUPPORTED_CITIES).describe('One of the five supported cities. Never substitute.'),
+      checkIn: z.string().regex(ISO_DATE).optional().describe('YYYY-MM-DD. Omit to use the default window.'),
+      checkOut: z.string().regex(ISO_DATE).optional().describe('YYYY-MM-DD. Omit to use the default window.'),
+      adults: z.number().int().min(1).max(8).optional().describe('Number of adults. Defaults to 2.'),
+    },
+  },
+  async ({ city, checkIn, checkOut, adults = 2 }) => {
+    // Dates are defaulted only when BOTH are absent. A user-supplied range is
+    // passed through untouched, even if it turns out to have no availability.
+    const defaulted = !checkIn && !checkOut;
+    const dates = defaulted ? defaultDates() : { checkIn, checkOut };
+
+    if (!dates.checkIn || !dates.checkOut) {
+      return {
+        isError: true,
+        content: [{ type: 'text', text: 'Provide both checkIn and checkOut, or neither.' }],
+      };
+    }
+
+    try {
+      const { hotels } = await searchHotels({ city, adults, ...dates });
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              city,
+              checkIn: dates.checkIn,
+              checkOut: dates.checkOut,
+              adults,
+              defaultedDates: defaulted,
+              count: hotels.length,
+              hotels,
+            }),
+          },
+        ],
+      };
+    } catch (err) {
+      // A genuine upstream failure — distinct from "no hotels available",
+      // which is a successful search returning an empty list.
+      return {
+        isError: true,
+        content: [{ type: 'text', text: `Hotel search failed: ${err.message}` }],
+      };
+    }
+  }
+);
+
+const transport = new StdioServerTransport();
+await server.connect(transport);

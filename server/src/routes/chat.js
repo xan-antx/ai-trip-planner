@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query } from '../../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
 import { generateChatReply } from '../gemini.js';
+import { listTools, callTool } from '../mcp/client.js';
 
 const router = Router();
 
@@ -141,6 +142,10 @@ function buildPrompt(cityName, places, detailed, message, distances = new Map())
     '   somewhere that is not in the index, make clear it is a general suggestion.',
     '2. Prefer the DETAILED ENTRIES when they fit the question.',
     '3. You may also use your own general knowledge of the city.',
+    '4. Live hotel prices and availability come only from the search_hotels tool. If it',
+    '   returns no hotels, say plainly that none were available for those dates — do not',
+    '   retry with different dates, and do not name hotels you half-remember as if they',
+    '   were live results. The same honesty rule as (1), applied to hotels.',
   ].join('\n');
 
   const userPrompt = [
@@ -195,9 +200,24 @@ router.post('/', requireAuth, async (req, res, next) => {
       distances
     );
 
-    let reply;
+    // Tool access is best-effort: if the MCP server can't start, the chatbot
+    // still answers from local context exactly as it did in Phase 3.
+    let tools;
     try {
-      reply = await generateChatReply({ systemInstruction, userPrompt });
+      tools = await listTools();
+    } catch (err) {
+      console.error('MCP unavailable, continuing without tools:', err.message);
+    }
+
+    let reply;
+    let toolCalls = [];
+    try {
+      ({ text: reply, toolCalls } = await generateChatReply({
+        systemInstruction,
+        userPrompt,
+        tools,
+        executeTool: tools ? callTool : undefined,
+      }));
     } catch (err) {
       // Clear upstream error — never a silent empty 200.
       return res
@@ -208,6 +228,17 @@ router.post('/', requireAuth, async (req, res, next) => {
     res.json({
       city,
       reply,
+      hotelSearch: toolCalls
+        .filter((c) => c.name === 'search_hotels')
+        .map(({ args, result }) => ({
+          args,
+          checkIn: result?.checkIn ?? null,
+          checkOut: result?.checkOut ?? null,
+          defaultedDates: result?.defaultedDates ?? null,
+          count: result?.count ?? 0,
+          hotels: result?.hotels ?? [],
+          error: result?.error ?? null,
+        })),
       context: {
         matchedAreas,
         radiusKm: RADIUS_KM,

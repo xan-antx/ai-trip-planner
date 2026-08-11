@@ -4,6 +4,7 @@ import cors from 'cors';
 import authRoutes from './routes/auth.js';
 import cityRoutes from './routes/cities.js';
 import chatRoutes from './routes/chat.js';
+import { closeClient } from './mcp/client.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -28,6 +29,14 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
+const httpServer = app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
 });
+
+// Close the MCP child process on exit so it doesn't outlive the server.
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, () => {
+    httpServer.close();
+    closeClient().finally(() => process.exit(0));
+  });
+}

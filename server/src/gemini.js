@@ -27,26 +27,22 @@ export class GeminiError extends Error {
   }
 }
 
-/**
- * Send a grounded prompt to Gemini and return the reply text.
- * Throws GeminiError on timeout, upstream failure, or an empty/blocked
- * response — the caller must never surface a silent empty answer.
- */
-export async function generateChatReply({ systemInstruction, userPrompt }) {
+const MAX_TOOL_ROUNDS = 2;
+
+async function callGemini({ contents, systemInstruction, tools }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-  let response;
   try {
-    response = await ai.models.generateContent({
+    return await ai.models.generateContent({
       model: MODEL,
-      contents: userPrompt,
+      contents,
       config: {
         systemInstruction,
         temperature: 0.7,
         maxOutputTokens: 800,
         abortSignal: controller.signal,
         httpOptions: { timeout: TIMEOUT_MS },
+        ...(tools?.length ? { tools: [{ functionDeclarations: tools }] } : {}),
       },
     });
   } catch (err) {
@@ -60,16 +56,62 @@ export async function generateChatReply({ systemInstruction, userPrompt }) {
   } finally {
     clearTimeout(timer);
   }
+}
 
-  const text = response?.text?.trim();
-  if (!text) {
-    // No candidates, or blocked by a safety filter — surface it, don't 200 with "".
-    const reason = response?.promptFeedback?.blockReason;
-    throw new GeminiError(`Gemini returned no text${reason ? ` (blockReason: ${reason})` : ''}`, {
-      status: 502,
-      clientMessage: 'The AI service could not generate a response for that message.',
-    });
+/**
+ * Send a grounded prompt to Gemini and return the reply text.
+ * Throws GeminiError on timeout, upstream failure, or an empty/blocked
+ * response — the caller must never surface a silent empty answer.
+ *
+ * When `tools` (Gemini function declarations) and `executeTool` are supplied,
+ * function calls are executed and fed back for up to MAX_TOOL_ROUNDS rounds.
+ * Omitting them reproduces the original single-round behaviour exactly.
+ *
+ * Returns { text, toolCalls } — toolCalls records what was actually invoked,
+ * so the route can report it without re-deriving it.
+ */
+export async function generateChatReply({ systemInstruction, userPrompt, tools, executeTool }) {
+  const contents = [{ role: 'user', parts: [{ text: userPrompt }] }];
+  const toolCalls = [];
+
+  for (let round = 0; ; round += 1) {
+    // Stop offering tools once the budget is spent, so the last round is
+    // forced to produce prose rather than another function call.
+    const offerTools = executeTool && round < MAX_TOOL_ROUNDS ? tools : undefined;
+    const response = await callGemini({ contents, systemInstruction, tools: offerTools });
+
+    const calls = response?.functionCalls ?? [];
+    if (offerTools && calls.length > 0) {
+      const modelTurn = response?.candidates?.[0]?.content;
+      if (modelTurn) contents.push(modelTurn);
+
+      const parts = [];
+      for (const call of calls) {
+        let payload;
+        try {
+          payload = await executeTool(call.name, call.args ?? {});
+        } catch (err) {
+          // Hand the failure to the model as data so it can explain itself,
+          // rather than throwing and losing the turn entirely.
+          payload = { error: err.message };
+        }
+        toolCalls.push({ name: call.name, args: call.args ?? {}, result: payload });
+        parts.push({ functionResponse: { name: call.name, response: payload } });
+      }
+      contents.push({ role: 'user', parts });
+      continue;
+    }
+
+    const text = response?.text?.trim();
+    if (!text) {
+      // No candidates, or blocked by a safety filter — surface it, don't 200 with "".
+      const reason = response?.promptFeedback?.blockReason;
+      throw new GeminiError(`Gemini returned no text${reason ? ` (blockReason: ${reason})` : ''}`, {
+        status: 502,
+        clientMessage: 'The AI service could not generate a response for that message.',
+      });
+    }
+
+    return { text, toolCalls };
   }
-
-  return text;
 }

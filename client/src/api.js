@@ -51,4 +51,10 @@ export const api = {
 
   places: (cityId, category) =>
     apiFetch(`/api/cities/${cityId}/places${category ? `?category=${category}` : ''}`),
+
+  chat: (cityId, message) =>
+    apiFetch('/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({ cityId: Number(cityId), message }),
+    }),
 };

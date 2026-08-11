@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import PlaceCard from '../components/PlaceCard.jsx';
+import ChatPanel from '../components/ChatPanel.jsx';
 
 const CATEGORIES = [
   { key: 'tourist_spot', label: 'Things to see' },
@@ -44,32 +45,38 @@ export default function CityPlacesPage() {
       <h2 className="page-title">{data.city.name}</h2>
       <p className="muted subtitle">{data.total} places</p>
 
-      <div className="tabs tabs--wide" role="tablist">
-        {CATEGORIES.map(({ key, label }) => (
-          <button
-            key={key}
-            role="tab"
-            aria-selected={active === key}
-            className={active === key ? 'tab tab--active' : 'tab'}
-            onClick={() => setActive(key)}
-          >
-            {label}
-            <span className="tab-count">{data.placesByCategory[key]?.length ?? 0}</span>
-          </button>
-        ))}
-      </div>
+      <div className="city-layout">
+        <div>
+          <div className="tabs tabs--wide" role="tablist">
+            {CATEGORIES.map(({ key, label }) => (
+              <button
+                key={key}
+                role="tab"
+                aria-selected={active === key}
+                className={active === key ? 'tab tab--active' : 'tab'}
+                onClick={() => setActive(key)}
+              >
+                {label}
+                <span className="tab-count">{data.placesByCategory[key]?.length ?? 0}</span>
+              </button>
+            ))}
+          </div>
 
-      {places.length === 0 ? (
-        <p className="muted">Nothing listed in this category yet.</p>
-      ) : (
-        <ul className="place-grid">
-          {places.map((place) => (
-            <li key={place.id}>
-              <PlaceCard place={place} />
-            </li>
-          ))}
-        </ul>
-      )}
+          {places.length === 0 ? (
+            <p className="muted">Nothing listed in this category yet.</p>
+          ) : (
+            <ul className="place-grid">
+              {places.map((place) => (
+                <li key={place.id}>
+                  <PlaceCard place={place} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <ChatPanel cityId={cityId} cityName={data.city.name} />
+      </div>
     </>
   );
 }
