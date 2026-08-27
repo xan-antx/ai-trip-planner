@@ -3,3 +3,6 @@ node_modules/
 .env.local
 dist/
 *.log
+
+# personal notes, not part of the app
+things to learn.txt
