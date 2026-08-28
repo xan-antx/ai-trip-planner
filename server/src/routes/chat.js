@@ -132,8 +132,16 @@ function buildPrompt(cityName, places, detailed, message, distances = new Map())
         .join('\n')
     : 'None matched — answer from the index above and your own general knowledge.';
 
+  // en-CA gives local-time YYYY-MM-DD; toISOString would be UTC, which is
+  // yesterday's date until 05:30 IST. Weekday included so "next weekend"
+  // is resolvable at all.
+  const now = new Date();
+  const today = `${now.toLocaleDateString('en-US', { weekday: 'long' })}, ${now.toLocaleDateString('en-CA')}`;
+
   const systemInstruction = [
     `You are a local travel assistant for ${cityName}.`,
+    `Today is ${today} (YYYY-MM-DD). Resolve relative dates ("next weekend",`,
+    `"in two weeks") against this date before passing dates to any tool.`,
     'You are given a LOCAL INDEX of places from our database (name · category · area),',
     'and, when relevant, DETAILED ENTRIES with descriptions and price levels.',
     'Give concise, practical recommendations.',
