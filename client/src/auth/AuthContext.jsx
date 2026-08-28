@@ -17,7 +17,16 @@ export function AuthProvider({ children }) {
     api
       .me()
       .then((data) => setUser(data.user))
-      .catch(() => localStorage.removeItem(TOKEN_KEY)) // expired or tampered
+      .catch((err) => {
+        // Only a definitive rejection of the token (expired or tampered)
+        // clears it. A 500, timeout, or network failure (no err.status)
+        // keeps the session; the next refresh simply retries.
+        if (err.status === 401) {
+          localStorage.removeItem(TOKEN_KEY);
+        } else {
+          console.error('Could not verify session:', err.message);
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 
