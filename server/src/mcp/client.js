@@ -10,7 +10,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_ENTRY = path.resolve(__dirname, '../../../mcp-hotels/src/index.js');
@@ -27,7 +27,7 @@ async function connect() {
     args: [SERVER_ENTRY],
     // The key crosses here, into the child's environment only. It is never
     // part of any HTTP response, so it cannot reach the browser client.
-    env: { ...process.env, LITEAPI_KEY: process.env.LITEAPI_KEY },
+    env: { ...getDefaultEnvironment(), LITEAPI_KEY: process.env.LITEAPI_KEY },
     stderr: 'inherit',
   });
 
