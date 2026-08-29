@@ -8,6 +8,11 @@ const router = Router();
 const SALT_ROUNDS = 12;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// A real bcrypt hash at SALT_ROUNDS cost (of an arbitrary string, never a
+// user's). Login compares against it when the email is unknown, so both
+// failure paths do the same bcrypt work. Regenerate if SALT_ROUNDS changes.
+const DUMMY_HASH = '$2b$12$mzq/ZNeElWU3xj7VYflKOOuJz.S1NTtFmJffsBklZ.c4DA3u6EjtO';
+
 function validateCredentials(body) {
   const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
   const password = typeof body?.password === 'string' ? body.password : '';
@@ -54,9 +59,12 @@ router.post('/login', async (req, res, next) => {
     );
     const user = rows[0];
 
-    // Same response whether the email is unknown or the password is wrong,
-    // so the endpoint can't be used to enumerate accounts.
-    const ok = user && (await bcrypt.compare(password, user.password_hash));
+    // Unknown email and wrong password return the same message AND cost the
+    // same time: exactly one bcrypt compare runs on every login attempt
+    // (against DUMMY_HASH when the email is unknown), so neither the response
+    // body nor its timing can be used to enumerate accounts.
+    const match = await bcrypt.compare(password, user?.password_hash ?? DUMMY_HASH);
+    const ok = Boolean(user) && match;
     if (!ok) return res.status(401).json({ error: 'Invalid email or password' });
 
     res.json({
